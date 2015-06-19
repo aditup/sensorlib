@@ -321,7 +321,8 @@ def check_screen_on():
 def get_max_media_volume():
   """
   <Purpose>
-  Returns the current maximum media volume on the device.
+  Returns the current maximum media volume on the device. Calls
+  sensorlib.request_data(sensor_socket, 'getMaxMediaVolume', []).
 
   <Arguments>
   None.
@@ -337,33 +338,6 @@ def get_max_media_volume():
 
   <Returns>
   A integer variable indicating the maximum media volume on the device.
-  Calls sensorlib.request_data(sensor_socket, 'getMaxMediaVolume', []).
-
-  """
-
-  sensorlib.request_data(sensor_socket, 'getMaxMediaVolume', [])
-
-
-def get_max_media_volume():
-  """
-  <Purpose>
-  Returns the current maximum media volume on the device.
-
-  <Arguments>
-  None.
-
-  <Exceptions>
-  None.
-
-  <Side Effects>
-  None.
-
-  <Resource Consumption>
-  Lookup the current maximum media volume on the device.
-
-  <Returns>
-  A integer variable indicating the maximum media volume on the device.
-  Calls sensorlib.request_data(sensor_socket, 'getMaxMediaVolume', []).
 
   """
 
