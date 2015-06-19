@@ -70,4 +70,22 @@ CHILD_CONTEXT_DEF["check_ringer_silent_mode"] = {
     "target": getsensor.check_ringer_silent_mode,
 }
 
+
+CHILD_CONTEXT_DEF["check_screen_on"] = {
+    "type": "func",
+    "args": None,
+    "return": bool,
+    "exceptions": "any",
+    "target": getsensor.check_screen_on,
+}
+
+
+CHILD_CONTEXT_DEF["get_max_media_volume"] = {
+    "type": "func",
+    "args": None,
+    "return": (int,type(None)),
+    "exceptions": "any",
+    "target": getsensor.get_max_media_volume,
+}
+
 secure_dispatch_module()

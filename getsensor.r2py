@@ -36,7 +36,7 @@ def get_location():
     using unicode_scrubber.
 
   <Arguments>
-    None
+    None.
 
   <Exceptions>
     LocationNotFoundException (descends from RepyException) when no location 
@@ -90,7 +90,7 @@ def get_lastknown_location():
   using unicode_scrubber.
 
   <Arguments>
-  None
+  None.
 
   <Exceptions>
   LocationNotFoundException (descends from RepyException) when the returned
@@ -143,7 +143,7 @@ def is_wifi_enabled():
   Return if WiFi is enabled on this device (True/False). 
 
   <Arguments>
-  None
+  None.
 
   <Exceptions>
   None. 
@@ -155,8 +155,8 @@ def is_wifi_enabled():
   Lookup if WiFi is enabled on the device. 
 
   <Returns>
-  A boolean vaiable indicating if WiFi is enabled on the device. 
-  
+  A boolean variable indicating if WiFi is enabled on the device. 
+
   """
 
   # True or False
@@ -170,7 +170,7 @@ def get_wifi_connection_info():
   sensorlib.request_data(sensor_socket, 'wifiGetConnectionInfo', []). 
 
   <Arguments>
-  None
+  None.
 
   <Exceptions>
   None. 
@@ -209,7 +209,7 @@ def do_wifi_scan():
   sensorlib.request_data(sensor_socket, 'wifiGetScanResults', []).
 
   <Arguments>
-  None
+  None.
 
   <Exceptions>
   None. 
@@ -244,10 +244,10 @@ def do_wifi_scan():
 def check_airplane_mode():
   """
   <Purpose>
-  Return if Airplane mode is enabled on this device (True/False). 
+  Checks whether the Airplane mode setting has been turned on. 
 
   <Arguments>
-  None
+  None.
 
   <Exceptions>
   None. 
@@ -259,20 +259,20 @@ def check_airplane_mode():
   Lookup if Airplane mode is enabled on the device. 
 
   <Returns>
-  A boolean vaiable indicating if Airplane mode is enabled on the device. 
-  
+  A boolean variable indicating if Airplane mode is enabled on the device. 
+
   """
 
   # True or False
   return sensorlib.request_data(sensor_socket, 'checkAirplaneMode', [])
-  
+
 def check_ringer_silent_mode():
   """
   <Purpose>
-  Return if Silent mode is enabled on this device (True/False). 
+  Checks the ringer silent mode setting on the device (True/False). 
 
   <Arguments>
-  None
+  None.
 
   <Exceptions>
   None. 
@@ -284,9 +284,87 @@ def check_ringer_silent_mode():
   Lookup if Silent mode is enabled on the device. 
 
   <Returns>
-  A boolean vaiable indicating if Silent mode is enabled on the device. 
+  A boolean variable indicating if Silent mode is enabled on the device. 
   
   """
 
   # True or False
   return sensorlib.request_data(sensor_socket, 'checkRingerSilentMode', [])
+
+
+def check_screen_on():
+  """
+  <Purpose>
+  Checks if the screen is currently on or off (True/False). 
+
+  <Arguments>
+  None.
+
+  <Exceptions>
+  None. 
+
+  <Side Effects>
+  None.
+
+  <Resource Consumption>
+  Lookup if screen is currently on on the device. 
+
+  <Returns>
+  A boolean variable indicating if screen is currently on on the device. 
+
+  """
+
+  # True or False
+  return sensorlib.request_data(sensor_socket, 'checkScreenOn', [])
+
+
+def get_max_media_volume():
+  """
+  <Purpose>
+  Returns the current maximum media volume on the device.
+
+  <Arguments>
+  None.
+
+  <Exceptions>
+  None.
+
+  <Side Effects>
+  None.
+
+  <Resource Consumption>
+  Lookup the current maximum media volume on the device.
+
+  <Returns>
+  A integer variable indicating the maximum media volume on the device.
+  Calls sensorlib.request_data(sensor_socket, 'getMaxMediaVolume', []).
+
+  """
+
+  sensorlib.request_data(sensor_socket, 'getMaxMediaVolume', [])
+
+
+def get_max_media_volume():
+  """
+  <Purpose>
+  Returns the current maximum media volume on the device.
+
+  <Arguments>
+  None.
+
+  <Exceptions>
+  None.
+
+  <Side Effects>
+  None.
+
+  <Resource Consumption>
+  Lookup the current maximum media volume on the device.
+
+  <Returns>
+  A integer variable indicating the maximum media volume on the device.
+  Calls sensorlib.request_data(sensor_socket, 'getMaxMediaVolume', []).
+
+  """
+
+  sensorlib.request_data(sensor_socket, 'getMaxMediaVolume', [])
