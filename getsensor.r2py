@@ -239,3 +239,29 @@ def do_wifi_scan():
   # we do not need to stop scan (it stops itself after scan is done)
   # convert unicode format to ASCII
   return unicode_scrubber.scrub(wifi_data)
+
+
+def check_airplane_mode():
+  """
+  <Purpose>
+  Return if Airplane mode is enabled on this device (True/False). 
+
+  <Arguments>
+  None
+
+  <Exceptions>
+  None. 
+
+  <Side Effects>
+  None.
+
+  <Resource Consumption>
+  Lookup if Airplane mode is enabled on the device. 
+
+  <Returns>
+  A boolean vaiable indicating if Airplane mode is enabled on the device. 
+  
+  """
+
+  # True or False
+  return sensorlib.request_data(sensor_socket, 'checkAirplaneMode', [])

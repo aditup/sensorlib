@@ -52,5 +52,14 @@ CHILD_CONTEXT_DEF["do_wifi_scan"] = {
     "target": getsensor.do_wifi_scan,
 }
 
+
+CHILD_CONTEXT_DEF["check_airplane_mode"] = {
+    "type": "func",
+    "args": None,
+    "return": bool,
+    "exceptions": "any",
+    "target": getsensor.check_airplane_mode,
+}
+
 secure_dispatch_module()
 
