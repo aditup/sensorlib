@@ -61,5 +61,13 @@ CHILD_CONTEXT_DEF["check_airplane_mode"] = {
     "target": getsensor.check_airplane_mode,
 }
 
-secure_dispatch_module()
 
+CHILD_CONTEXT_DEF["check_ringer_silent_mode"] = {
+    "type": "func",
+    "args": None,
+    "return": bool,
+    "exceptions": "any",
+    "target": getsensor.check_ringer_silent_mode,
+}
+
+secure_dispatch_module()

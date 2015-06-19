@@ -265,3 +265,28 @@ def check_airplane_mode():
 
   # True or False
   return sensorlib.request_data(sensor_socket, 'checkAirplaneMode', [])
+  
+def check_ringer_silent_mode():
+  """
+  <Purpose>
+  Return if Silent mode is enabled on this device (True/False). 
+
+  <Arguments>
+  None
+
+  <Exceptions>
+  None. 
+
+  <Side Effects>
+  None.
+
+  <Resource Consumption>
+  Lookup if Silent mode is enabled on the device. 
+
+  <Returns>
+  A boolean vaiable indicating if Silent mode is enabled on the device. 
+  
+  """
+
+  # True or False
+  return sensorlib.request_data(sensor_socket, 'checkRingerSilentMode', [])
