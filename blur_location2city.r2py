@@ -28,7 +28,7 @@ def get_file_from_server(filename):
 
   """
   if filename not in listfiles():
-    url = "http://sensibilityclearinghouse.poly.edu/data/" + filename
+    url = "http://sensibilityclearinghouse.poly.edu/data/quad/" + filename
     httpretrieve.httpretrieve_save_file(url, filename)
 
 
@@ -113,7 +113,7 @@ def load_city_geodata(filename):
   get_file_from_server(filename)
   city_dict = {}
   city_geodata_fileobj = openfile(filename, False)
-  city_geodata_file = city_geodata_fileobj.reat(None, 0).split("\n")
+  city_geodata_file = city_geodata_fileobj.readat(None, 0).split("\n")
 
   for line in city_geodata_file:
     # Ignore the empty line at the end of the file
@@ -159,7 +159,7 @@ def get_city_location():
     location_data["longitude"])
 
   location_data["latitude"], location_data["longitude"] = \
-    closest["coordinates"]
+    closest_city["coordinates"]
 
   return location_data
 
@@ -185,7 +185,7 @@ def get_city_lastknown_location():
       provider_location_data["longitude"])
     
     location_data[location_provider]["latitude"], \
-      location_data[provider]["longitude"] = closest["coordinates"]
+      location_data[location_provider]["longitude"] = closest_city["coordinates"]
 
   return location_data
 
