@@ -53,39 +53,78 @@ CHILD_CONTEXT_DEF["do_wifi_scan"] = {
 }
 
 
-CHILD_CONTEXT_DEF["check_airplane_mode"] = {
+CHILD_CONTEXT_DEF["get_battery_info"] = {
+    "type": "func",
+    "args": None,
+    "return": dict,
+    "exceptions": "any",
+    "target": getsensor.get_battery_info,
+}
+
+
+CHILD_CONTEXT_DEF["get_bluetooth_info"] = {
+    "type": "func",
+    "args": None,
+    "return": dict,
+    "exceptions": "any",
+    "target": getsensor.get_bluetooth_info,
+}
+
+
+CHILD_CONTEXT_DEF["is_roaming"] = {
     "type": "func",
     "args": None,
     "return": bool,
     "exceptions": "any",
-    "target": getsensor.check_airplane_mode,
+    "target": getsensor.is_roaming,
 }
 
 
-CHILD_CONTEXT_DEF["check_ringer_silent_mode"] = {
+
+CHILD_CONTEXT_DEF["get_cellular_provider_info"] = {
     "type": "func",
     "args": None,
-    "return": bool,
+    "return": dict,
     "exceptions": "any",
-    "target": getsensor.check_ringer_silent_mode,
+    "target": getsensor.get_cellular_provider_info,
 }
 
 
-CHILD_CONTEXT_DEF["check_screen_on"] = {
+CHILD_CONTEXT_DEF["get_cell_info"] = {
     "type": "func",
     "args": None,
-    "return": bool,
+    "return": dict,
     "exceptions": "any",
-    "target": getsensor.check_screen_on,
+    "target": getsensor.get_cell_info,
 }
 
 
-CHILD_CONTEXT_DEF["get_max_media_volume"] = {
+CHILD_CONTEXT_DEF["get_SIM_info"] = {
     "type": "func",
     "args": None,
-    "return": (int,type(None)),
+    "return": dict,
     "exceptions": "any",
-    "target": getsensor.get_max_media_volume,
+    "target": getsensor.get_SIM_info,
 }
+
+
+CHILD_CONTEXT_DEF["get_phone_info"] = {
+    "type": "func",
+    "args": None,
+    "return": dict,
+    "exceptions": "any",
+    "target": getsensor.get_phone_info,
+}
+
+
+CHILD_CONTEXT_DEF["get_cellular_signal_strengths"] = {
+    "type": "func",
+    "args": None,
+    "return": dict,
+    "exceptions": "any",
+    "target": getsensor.get_cellular_signal_strengths,
+}
+
 
 secure_dispatch_module()
+
