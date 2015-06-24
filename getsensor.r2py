@@ -821,7 +821,7 @@ def stop_sensing():
   
 
 def get_sensors():
-   """
+  """
   <Purpose>
     Get the most recently recorded sensor data (accelerometer, 
     magnetic and orientation), in dictionary of sensors. Calls 
@@ -847,9 +847,9 @@ def get_sensors():
     "accuracy":3}.
   """
 
-  sensors = sensorlib.request_data(sensor_socket, 'readSensors', [1, 1])
+  sensors = sensorlib.request_data(sensor_socket, 'readSensors', [])
   return unicode_scrubber.scrub(sensors)
-  
+
 
 def get_sensors_accuracy():
   """
@@ -962,7 +962,7 @@ def get_magnetic_field():
 
 
 def get_orientation():
-   """
+  """
   <Purpose>
     Get the most recently received orientation value. Calls 
     sensorlib.request_data(sensor_socket, 'sensorsReadOrientation', 
@@ -985,6 +985,6 @@ def get_orientation():
     [-0.17154279351234436, 0.080450139939785, -0.03844258934259415].
   """
 
-  return sensorlib.request_data(sensor_socket, 
-                                'sensorsReadOrientation', [])
+  return sensorlib.request_data(sensor_socket,
+    'sensorsReadOrientation', [])
 
