@@ -1,191 +1,254 @@
+"""
+A security layer for the functions get_location() and get_lastknown_location()
+defined in getsensor.r2py. This program blurs the latitude/longitude
+coordinates, received from the location sensors of an Android device,
+to the geographic center of approximately the nearest state.
+
+The blurring is done using a database lookup method. First, we find the
+city closest to the original latitude/longitude coordinates from the
+cities' database and extract the geodata associated with it. This
+database, located at http://sensibilityclearinghouse.poly.edu/data/quad/,
+contains a list of cities and their geodata (latitude, longitude,
+country code, state code), divided by their coordinates into cells.
+Each cell is a separate file in the database, whose name is derived
+as "ceiling(latitude)_ceiling(longitude).txt". For example, Manhattan
+has its center at coordinates 40.78343, -73.96625, so it will be mapped
+to the file with name "41_-73.txt".
+
+Next, we use the state code and country code from the city's geodata to
+look up the coordinates of the geographic center of the state to which
+the city belongs. This look up uses the states' database, states.txt,
+located at http://sensibilityclearinghouse.poly.edu/data/. states.txt
+is a database of the top level administrative divisions within each
+country (for example, states/provinces). It has the following fields:
+code, state name, latitude, longitude. The code field has the format
+"country_code.state_code", where country_code is the ISO-3166 2-letter
+country code of the country to which the admin division belongs and
+state_code is the 2-digit state code representing the admin division.
+
+Usage:
+  start dylink.r2py encasementlib.r2py sensor_layer.r2py \
+    blur_location2state.r2py user-program.r2py
+"""
+
+
+
 httpretrieve = dy_import_module("httpretrieve.r2py")
 math = dy_import_module("math.r2py")
-librepyfile = dy_import_module("librepyfile.r2py")
 
-statefilename = "states.txt"        # Database of states
-countryfilename = "countries.txt"   # Database of countries
+statefilename = "states.txt"
 
 
-# Downloads the required file from the server
+
+def load_city_geodata(filename):
+  """
+  Loads all the cities and their geodata from the given file into a
+  dictionary. The dictionary that is returned has the format:
+  {
+    city1: {"latitude": latitude, "longitude": longitude, "country_code":
+    country_code, "state_code": state_code},
+    city2: {"latitude": latitude, "longitude": longitude, "country_code":
+    country_code, "state_code": state_code},
+    ...
+  }
+
+  """
+  get_file_from_server(filename)
+  city_dict = {}
+  city_geodata_fileobj = openfile(filename, False)
+  city_geodata_file = city_geodata_fileobj.readat(None, 0).split("\n")
+
+  for line in city_geodata_file:
+    # Ignore the empty line at the end of the file
+    if line == "":
+      continue
+    city_geodata_record = line.split("\t")
+    city_name = city_geodata_record[0]
+    lat = float(city_geodata_record[1])
+    lon = float(city_geodata_record[2])
+    city_dict[city_name] = {
+      "latitude": lat,
+      "longitude": lon,
+      "country_code": city_geodata_record[3],
+      "state_code": city_geodata_record[4]
+    }
+  city_geodata_fileobj.close()
+  return city_dict
+
+
+
 def get_file_from_server(filename):
+  """
+  Downloads the required file from the database server, if it has not
+  already been downloaded.
 
-  if filename not in listfiles(): # In case it already exists
-    if filename not in [statefilename, countryfilename]:
-      url = "http://sensibilityclearinghouse.poly.edu/data/quad/" + filename
-    else:
+  """
+  if filename not in listfiles():
+    if filename == statefilename:
       url = "http://sensibilityclearinghouse.poly.edu/data/" + filename
+    else:
+      url = "http://sensibilityclearinghouse.poly.edu/data/quad/" + filename
     httpretrieve.httpretrieve_save_file(url, filename)
 
 
-# Returns a dictionary containing information about the point closest to
-# a given lat/lng pair, from the database.
-# {"city": closest_city, "statecode": closest_state_code, "countrycode":
-# closest_country_code, "coordinates": closest_point}
-def find_closest_point(lat, lng):
 
-  # Find the database file with coordinates closest to the given lat/lng pair
-  filename = get_filename(lat, lng)
-	# Get the list of coordinates from that file
-  listofpoints = load_lat_lng_from_file(filename)
+def find_closest_city(lat, lon):
+  """
+  Finds the city closest to the given latitude/longitude pair from the
+  dictionary of cities returned by the load_city_geodata() function,
+  and returns that city's geodata in the format:
+  {
+    "city_name": city name (string),
+    "state_code": 2-digit code representing the state to which the city
+      belongs (string),
+    "country_code": 2-letter ISO-3166 code representing the country to
+      which the city belongs (string),
+    "latitude": latitude of the geographic center of the city (float)
+    "longitude": longitude of the geographic center of the city (float)
+  }
 
-  min_dist = 9999
-  point1 = (lat, lng)
+  Note: We're looking for the closest city within the same cell as the
+  given latitude/longitude pair. There might be a closer city in the
+  surrounding cells.
 
-  for city in listofpoints.keys():
-    data = listofpoints[city]
-    point2 = (data[0], data[1])
-    dist = find_distance(point1, point2)
-    if dist < min_dist:
-      min_dist = dist
-      closest_point = point2
-      closest_city = city
-      closest_state_code = data[3]
-      closest_country_code = data[2]
+  """
+  # Determine which file to download from the database.
+  filename = get_database_filename(lat, lon)
 
-  closest = {"city": closest_city, "statecode": closest_state_code, "countrycode": closest_country_code, "coordinates": closest_point}
+  # Load all the cities and their geodata from the file.
+  city_dict = load_city_geodata(filename)
 
-  return closest
+  # Set the minimum squared difference between two pairs of coordinates
+  # to a number larger than any possible minimum distance to a close
+  # city in the current latitude/longitude quadrilateral.
+  min_diff = 9999
+
+  for city_name, city_geodata in city_dict.items():
+    diff = find_squared_difference((lat, lon), (city_geodata["latitude"],
+      city_geodata["longitude"]))
+    if diff < min_diff:
+      min_diff = diff
+      closest_city_latitude = city_geodata["latitude"]
+      closest_city_longitude = city_geodata["longitude"]
+      closest_city_name = city_name
+      closest_city_state_code = city_geodata["state_code"]
+      closest_city_country_code = city_geodata["country_code"]
+
+  closest_city_geodata = {
+    "city_name": closest_city_name,
+    "latitude": closest_city_latitude, 
+    "longitude": closest_city_longitude,
+    "state_code": closest_city_state_code,
+    "country_code": closest_city_country_code
+   }
+
+  return closest_city_geodata
 
 
-# Returns the filename in the database with coordinates closest to the given
-# lat/lng pair
-def get_filename(lat, lng):
 
-  # get ceiling as x/y index
+def get_database_filename(lat, lon):
+  """
+  Returns the filename of the cell in the database to which the given
+  latitude/longitude pair belongs.
+
+  """
+  # Get ceiling as x/y index.
   x = int(math.math_ceil(lat))
-  y = int(math.math_ceil(lng))
+  y = int(math.math_ceil(lon))
   filename = str(x) + '_' + str(y) + '.txt'
   return filename
 
 
-# Returns a dictionary containing all the cities in the given file, along with
-# their corresponding data
-# {city1: [lat, lng, country_code, state_code], city2: [lat, lng, country_code,
-# state_code], ...}
-def load_lat_lng_from_file(filename):
 
-  get_file_from_server(filename)
-  listofpoints = {}
-  fileobj = librepyfile.open(filename, "r")
+def find_squared_difference(p1, p2):
+  """
+  Returns the squared difference between the two given pairs of 
+  coordinates (p1 and p2, where p1 and p2 are tuples of the form
+  (latitude, longitude)).
 
-  while True:
-    try:
-      line = fileobj.next().strip()
-    except StopIteration:
-      break
-    else:
-      line = line.split("\t")
-      city_name = line[0]
-      lat = line[1]
-      lng = line[2]
-      country_code = line[3]
-      state_code = line[4]
-      listofpoints[city_name] = [lat, lng, country_code, state_code]
-  fileobj.close()
-  return listofpoints
+  """
+  lat1, lon1 = p1
+  lat2, lon2 = p2
+  lat_diff = (lat1-lat2) ** 2
+  lon_diff = (lon1-lon2) ** 2
+  return lat_diff + lon_diff
 
 
-# Returns the distance between two lat/lng points
-def find_distance(p1, p2):
 
-  (lat1, lng1) = p1
-  (lat2, lng2) = p2
-  lat2 = float(lat2)
-  lng2 = float(lng2)
-  lat_diff = (lat1-lat2) * (lat1-lat2)
-  lng_diff = (lng1-lng2) * (lng1-lng2)
-  # return squared distance
-  return lat_diff + lng_diff
-
-
-# To replace get_location()
 def get_state_location():
+  """
+  Blurring layer for the get_location() function. It replaces the exact
+  coordinates of the Android device with the coordinates for the
+  geographic center of the nearest state.
 
-  try:
-    location_data = get_location()
-  except Exception: # Not able to use LocationNotFoundException here
-    raise Exception
+  """
+  location_data = get_location()
 
-  latitude = location_data["latitude"]
-  longitude = location_data["longitude"]
+  closest_city = find_closest_city(location_data["latitude"],
+    location_data["longitude"])
 
-  closest = find_closest_point(latitude, longitude)
-  country_code = closest["countrycode"]
-  state_code = closest["statecode"]
-  code = country_code + "." + str(state_code)
+  code = closest_city["country_code"] + "." + str(closest_city["state_code"])
 
-  # Download the States database
+  # Download the states.txt database
   get_file_from_server(statefilename)
 
-  statefile = librepyfile.open(statefilename, "r")
+  state_fileobj = openfile(statefilename, False)
+  state_file = state_fileobj.readat(None, 0).split("\n")
 
   # Look for the state corresponding to the code
-  while True:
-    try:
-      line = statefile.next().strip()
-    except StopIteration:
+  for line in state_file:
+    state_record = line.split("\t")
+    if code == state_record[0]:
+      location_data["latitude"] = state_record[2]
+      location_data["longitude"] = state_record[3]
       break
-    else:
-      line = line.split("\t")
-      if code == line[0]:
-        slat = line[2]
-        slng = line[3]
-        break
-  statefile.close()
-
-  location_data["latitude"] = slat
-  location_data["longitude"] = slng
+  state_fileobj.close()
 
   return location_data
 
 
-# To replace get_lastknown_location()
+
 def get_state_lastknown_location():
+  """
+  Blurring layer for the get_lastknown_location() function. It replaces
+  the last-known coordinates of the Android device with the coordinates
+  for the geographic center of the nearest state.
 
-  try:
-    location_data = get_lastknown_location()
-  except Exception: # Not able to use LocationNotFoundException here
-    raise Exception
+  """
+  location_data = get_lastknown_location()
 
-  # Get the location from the the provider
-  for i in range(len(location_data.keys())):
-    provider = location_data.keys()[i]
-    location = location_data[provider]
-    if location != None:
-      latitude = location["latitude"]
-      longitude = location["longitude"]
+  # Get the location from every provider
+  for location_provider, provider_location_data in location_data.items():
+    # Skip blurring this provider's data if it doesn't contain a previous
+    # location.
+    if provider_location_data is None:
+      continue
 
-      closest = find_closest_point(latitude, longitude)
+    closest_city = find_closest_city(provider_location_data["latitude"],
+      provider_location_data["longitude"])
 
-      country_code = closest["countrycode"]
-      state_code = closest["statecode"]
-      code = country_code + "." + str(state_code)
+    code = closest_city["country_code"] + "." + str(closest_city["state_code"])
 
-		  # Download the States database
-      get_file_from_server(statefilename)
+    # Download the states.txt database
+    get_file_from_server(statefilename)
 
-      statefile = librepyfile.open(statefilename, "r")
+    state_fileobj = openfile(statefilename, False)
+    state_file = state_fileobj.readat(None, 0).split("\n")
 
-		  # Look for the state corresponding to the code
-      while True:
-        try:
-          line = statefile.next().strip()
-        except StopIteration:
-          break
-        else:
-          line = line.split("\t")
-          if code == line[0]:
-            slat = line[2]
-            slng = line[3]
-            break
-      statefile.close()
-			
-      location_data[provider]["latitude"] = slat
-      location_data[provider]["longitude"] = slng
+    # Look for the state corresponding to the code
+    for line in state_file:
+      state_record = line.split("\t")
+      if code == state_record[0]:
+        provider_location_data["latitude"] = state_record[2]
+        provider_location_data["longitude"] = state_record[3]
+        break
+    state_fileobj.close()
 
   return location_data
 
 
+
+# Mapping our blurring function get_state_location to get_location.
 CHILD_CONTEXT_DEF["get_location"] = {
     "type": "func",
     "args": None,
@@ -195,6 +258,8 @@ CHILD_CONTEXT_DEF["get_location"] = {
 }
 
 
+# Mapping our blurring function get_state_lastknown_location to
+# get_lastknown_location.
 CHILD_CONTEXT_DEF["get_lastknown_location"] = {
     "type": "func",
     "args": None,
@@ -203,4 +268,6 @@ CHILD_CONTEXT_DEF["get_lastknown_location"] = {
     "target": get_state_lastknown_location,
 }
 
+
+# Dispatch
 secure_dispatch_module()
