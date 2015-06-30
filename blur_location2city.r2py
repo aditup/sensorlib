@@ -1,13 +1,17 @@
 """
 A security layer for the functions get_location() and get_lastknown_location()
-defined in getsensor.r2py. This program blurs the coordinates, received
-from the location sensors of an Android device, to the geographic center of
-approximately the nearest city.
+defined in getsensor.r2py. This program blurs the latitude/longitude
+coordinates, received from the location sensors of an Android device,
+to the geographic center of approximately the nearest city.
 
-The blurring is done using a DB lookup method. The DB contains a list of
-cities, and their geodata (lat, lon, country code, state code), divided
-by their coordinates. The DB is is available at:
-http://sensibilityclearinghouse.poly.edu/data/quad/
+The blurring is done using a database lookup method. The database,
+located at http://sensibilityclearinghouse.poly.edu/data/quad/, contains
+a list of cities and their geodata (latitude, longitude, country code,
+state code), divided by their latitude/longitude coordinates into cells.
+Each cell is a separate file in the database, whose name is derived as
+"ceiling(latitude)_ceiling(longitude).txt". For example, Manhattan has
+its center at coordinates 40.78343, -73.96625, so it will be mapped to
+the file with name "41_-73.txt".
 
 Usage:
   start dylink.r2py encasementlib.r2py sensor_layer.r2py \
@@ -21,60 +25,101 @@ math = dy_import_module("math.r2py")
 
 
 
+def load_city_geodata(filename):
+  """
+  Loads all the cities and their geodata from the given file into a
+  dictionary. The dictionary that is returned has the format:
+  {
+    city1: {"latitude": latitude, "longitude": longitude, "country_code":
+    country_code, "state_code": state_code},
+    city2: {"latitude": latitude, "longitude": longitude, "country_code":
+    country_code, "state_code": state_code},
+    ...
+  }
+
+  """
+  get_file_from_server(filename)
+  city_dict = {}
+  city_geodata_fileobj = openfile(filename, False)
+  city_geodata_file = city_geodata_fileobj.readat(None, 0).split("\n")
+
+  for line in city_geodata_file:
+    # Ignore the empty line at the end of the file
+    if line == "":
+      continue
+    city_geodata_record = line.split("\t")
+    city_name = city_geodata_record[0]
+    lat = float(city_geodata_record[1])
+    lon = float(city_geodata_record[2])
+    city_dict[city_name] = {
+      "latitude": lat,
+      "longitude": lon,
+      "country_code": city_geodata_record[3],
+      "state_code": city_geodata_record[4]
+    }
+  city_geodata_fileobj.close()
+  return city_dict
+
+
+
 def get_file_from_server(filename):
   """
-  Downloads the required file from the DB server, if it has not already
-  been downloaded.
+  Downloads the required file from the database server, if it has not
+  already been downloaded.
 
   """
   if filename not in listfiles():
-    url = "http://sensibilityclearinghouse.poly.edu/data/" + filename
+    url = "http://sensibilityclearinghouse.poly.edu/data/quad/" + filename
     httpretrieve.httpretrieve_save_file(url, filename)
 
 
 
 def find_closest_city(lat, lon):
   """
-  Searches the DB and returns a dict containing the geodata of the city
-  that is approximately closest to a given lat/lon pair in the format:
+  Finds the city closest to the given latitude/longitude pair from the
+  dictionary of cities returned by the load_city_geodata() function,
+  and returns that city's geodata in the format:
   {
     "city_name": city name (string),
     "state_code": 2-digit code representing the state to which the city
       belongs (string),
     "country_code": 2-letter ISO-3166 code representing the country to
       which the city belongs (string),
-    "coordinates": tuple containing the lat/lon pair representing the
-      geographic center of the city (float, float)
+    "latitude": latitude of the geographic center of the city (float)
+    "longitude": longitude of the geographic center of the city (float)
   }
-  
-  Note: We're looking for the closest lat/lon pair within the same
-  quadrant as the given lat/lon pair. There might be closer ones in
-  other quadrants. Thus, the "closest city" is only an approximation.
+
+  Note: We're looking for the closest city within the same cell as the
+  given latitude/longitude pair. There might be a closer city in the
+  surrounding cells.
 
   """
-  # Determine which file to download from the DB.
+  # Determine which file to download from the database.
   filename = get_database_filename(lat, lon)
 
   # Load all the cities and their geodata from the file.
   city_dict = load_city_geodata(filename)
 
   # Set the minimum squared difference between two pairs of coordinates
-  # to an arbitrarily large number.
-  # XXX Should "large" be defined?
+  # to a number larger than any possible minimum distance to a close
+  # city in the current latitude/longitude quadrilateral.
   min_diff = 9999
 
   for city_name, city_geodata in city_dict.items():
-    city_lat, city_lon = city_geodata["coordinates"]
-    diff = find_squared_difference((lat, lon), (city_lat, city_lon))
+    diff = find_squared_difference((lat, lon), (city_geodata["latitude"],
+      city_geodata["longitude"]))
     if diff < min_diff:
       min_diff = diff
-      closest_city_coordinates = city_geodata["coordinates"]
+      closest_city_latitude = city_geodata["latitude"]
+      closest_city_longitude = city_geodata["longitude"]
       closest_city_name = city_name
       closest_city_state_code = city_geodata["state_code"]
       closest_city_country_code = city_geodata["country_code"]
 
-  closest_city_geodata = {"city_name": closest_city_name,
-    "coordinates": closest_city_coordinates, 
+  closest_city_geodata = {
+    "city_name": closest_city_name,
+    "latitude": closest_city_latitude, 
+    "longitude": closest_city_longitude,
     "state_code": closest_city_state_code,
     "country_code": closest_city_country_code
    }
@@ -85,8 +130,8 @@ def find_closest_city(lat, lon):
 
 def get_database_filename(lat, lon):
   """
-  Returns the filename in the DB with coordinates in the same quadrant
-  as the given lat/lon pair.
+  Returns the filename of the cell in the database to which the given
+  latitude/longitude pair belongs.
 
   """
   # Get ceiling as x/y index.
@@ -97,45 +142,11 @@ def get_database_filename(lat, lon):
 
 
 
-def load_city_geodata(filename):
-  """
-  Returns a dict containing all the cities in the given file,
-  along with their corresponding geodata in the format:
-  {
-    city1: {"coordinates": (lat, lon), "country_code": country_code,
-      "state_code": state_code},
-    city2: {"coordinates": (lat, lon), "country_code": country_code,
-      "state_code": state_code},
-    ...
-  }
-
-  """
-  get_file_from_server(filename)
-  city_dict = {}
-  city_geodata_fileobj = openfile(filename, False)
-  city_geodata_file = city_geodata_fileobj.reat(None, 0).split("\n")
-
-  for line in city_geodata_file:
-    # Ignore the empty line at the end of the file
-    if line == "":
-      continue
-    city_geodata_record = line.split("\t")
-    city_name = city_geodata_record[0]
-    lat = float(city_geodata_record[1])
-    lon = float(city_geodata_record[2])
-    city_dict[city_name] = {"coordinates": (lat, lon), 
-      "country_code": city_geodata_record[3],
-      "state_code": city_geodata_record[4]
-    }
-  city_geodata_fileobj.close()
-  return city_dict
-
-
-
 def find_squared_difference(p1, p2):
   """
-  Returns the squared difference between two pairs of coordinates (p1
-  and p2).
+  Returns the squared difference between the two given pairs of
+  coordinates (p1 and p2, where p1 and p2 are tuples of the form
+  (latitude, longitude)).
 
   """
   lat1, lon1 = p1
@@ -148,7 +159,7 @@ def find_squared_difference(p1, p2):
 
 def get_city_location():
   """
-  Security layer for the get_location() function. It replaces the exact
+  Blurring layer for the get_location() function. It replaces the exact
   coordinates of the Android device with the coordinates for the
   geographic center of the nearest city.
 
@@ -158,8 +169,8 @@ def get_city_location():
   closest_city = find_closest_city(location_data["latitude"],
     location_data["longitude"])
 
-  location_data["latitude"], location_data["longitude"] = \
-    closest["coordinates"]
+  location_data["latitude"] = closest_city["latitude"]
+  location_data["longitude"] = closest_city["longitude"]
 
   return location_data
 
@@ -167,7 +178,7 @@ def get_city_location():
 
 def get_city_lastknown_location():
   """
-  Security layer for the get_lastknown_location() function. It replaces
+  Blurring layer for the get_lastknown_location() function. It replaces
   the last-known coordinates of the Android device with the coordinates
   for the geographic center of the nearest city.
 
@@ -180,19 +191,18 @@ def get_city_lastknown_location():
     # location.
     if provider_location_data is None:
       continue
-    
+
     closest_city = find_closest_city(provider_location_data["latitude"],
       provider_location_data["longitude"])
-    
-    location_data[location_provider]["latitude"], \
-      location_data[provider]["longitude"] = closest["coordinates"]
+
+    location_data[location_provider]["latitude"] = closest_city["latitude"]
+    location_data[location_provider]["longitude"] = closest_city["longitude"]
 
   return location_data
 
 
 
-# Makes a security layer out of what otherwise would be just a plain
-# library you could `dy_import`
+# Mapping our blurring function get_city_location to get_location.
 CHILD_CONTEXT_DEF["get_location"] = {
     "type": "func",
     "args": None,
@@ -202,6 +212,8 @@ CHILD_CONTEXT_DEF["get_location"] = {
 }
 
 
+# Mapping our blurring function get_city_lastknown_location to
+# get_lastknown_location.
 CHILD_CONTEXT_DEF["get_lastknown_location"] = {
     "type": "func",
     "args": None,
@@ -211,4 +223,5 @@ CHILD_CONTEXT_DEF["get_lastknown_location"] = {
 }
 
 
+# Dispatch
 secure_dispatch_module()
