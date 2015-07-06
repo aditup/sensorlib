@@ -36,44 +36,37 @@ Usage:
 httpretrieve = dy_import_module("httpretrieve.r2py")
 math = dy_import_module("math.r2py")
 
-statefilename = "states.txt"
 
 
-
-def load_city_geodata(filename):
+def load_states_geodata(filename):
   """
-  Loads all the cities and their geodata from the given file into a
+  Loads all the states and their geodata from the given file into a
   dictionary. The dictionary that is returned has the format:
   {
-    city1: {"latitude": latitude, "longitude": longitude, "country_code":
-    country_code, "state_code": state_code},
-    city2: {"latitude": latitude, "longitude": longitude, "country_code":
-    country_code, "state_code": state_code},
+    state1: {"latitude": latitude, "longitude": longitude},
+    state2: {"latitude": latitude, "longitude": longitude},
     ...
   }
 
   """
   get_file_from_server(filename)
-  city_dict = {}
-  city_geodata_fileobj = openfile(filename, False)
-  city_geodata_file = city_geodata_fileobj.readat(None, 0).split("\n")
+  states_dict = {}
+  states_geodata_fileobj = openfile(filename.lower(), False)
+  states_geodata_file = states_geodata_fileobj.readat(None, 0).split("\n")
+  states_geodata_fileobj.close()
 
-  for line in city_geodata_file:
-    # Ignore the empty line at the end of the file
+  for line in states_geodata_file:
+    # Ignore the empty line at the end of the file.
     if line == "":
       continue
-    city_geodata_record = line.split("\t")
-    city_name = city_geodata_record[0]
-    lat = float(city_geodata_record[1])
-    lon = float(city_geodata_record[2])
-    city_dict[city_name] = {
-      "latitude": lat,
-      "longitude": lon,
-      "country_code": city_geodata_record[3],
-      "state_code": city_geodata_record[4]
+    state_geodata_record = line.split("\t")
+    state_name = state_geodata_record[1]
+    states_dict[state_name] = {
+      "latitude": float(state_geodata_record[2]),
+      "longitude": float(state_geodata_record[3]),
     }
-  city_geodata_fileobj.close()
-  return city_dict
+
+  return states_dict
 
 
 
@@ -84,15 +77,12 @@ def get_file_from_server(filename):
 
   """
   if filename not in listfiles():
-    if filename == statefilename:
-      url = "http://sensibilityclearinghouse.poly.edu/data/" + filename
-    else:
-      url = "http://sensibilityclearinghouse.poly.edu/data/quad/" + filename
-    httpretrieve.httpretrieve_save_file(url, filename)
+    url = "http://sensibilityclearinghouse.poly.edu/data/states/" + filename
+    httpretrieve.httpretrieve_save_file(url, filename.lower())
 
 
 
-def find_closest_city(lat, lon):
+def find_closest_state(lat, lon):
   """
   Finds the city closest to the given latitude/longitude pair from the
   dictionary of cities returned by the load_city_geodata() function,
@@ -115,34 +105,28 @@ def find_closest_city(lat, lon):
   # Determine which file to download from the database.
   filename = get_database_filename(lat, lon)
 
-  # Load all the cities and their geodata from the file.
-  city_dict = load_city_geodata(filename)
+  # Load all the states and their geodata from the file.
+  states_dict = load_states_geodata(filename)
 
   # Set the minimum squared difference between two pairs of coordinates
   # to a number larger than any possible minimum distance to a close
-  # city in the current latitude/longitude quadrilateral.
+  # state in the current country.
   min_diff = 9999
 
-  for city_name, city_geodata in city_dict.items():
-    diff = find_squared_difference((lat, lon), (city_geodata["latitude"],
-      city_geodata["longitude"]))
+  for state_name, state_geodata in states_dict.items():
+    diff = find_squared_difference((lat, lon), (state_geodata["latitude"],
+      state_geodata["longitude"]))
     if diff < min_diff:
       min_diff = diff
-      closest_city_latitude = city_geodata["latitude"]
-      closest_city_longitude = city_geodata["longitude"]
-      closest_city_name = city_name
-      closest_city_state_code = city_geodata["state_code"]
-      closest_city_country_code = city_geodata["country_code"]
+      closest_state_name = state_name
 
-  closest_city_geodata = {
-    "city_name": closest_city_name,
-    "latitude": closest_city_latitude, 
-    "longitude": closest_city_longitude,
-    "state_code": closest_city_state_code,
-    "country_code": closest_city_country_code
+  closest_state_geodata = {
+    "state_name": closest_state_name,
+    "latitude": states_dict[closest_state_name]["latitude"], 
+    "longitude": states_dict[closest_state_name]["longitude"],
    }
 
-  return closest_city_geodata
+  return closest_state_geodata
 
 
 
@@ -152,10 +136,9 @@ def get_database_filename(lat, lon):
   latitude/longitude pair belongs.
 
   """
-  # Get ceiling as x/y index.
-  x = int(math.math_ceil(lat))
-  y = int(math.math_ceil(lon))
-  filename = str(x) + '_' + str(y) + '.txt'
+  # Get the first address in the list of addresses
+  address = get_geolocation(lat, lon, 1)[0]
+  filename = address["country_code"] + ".txt"
   return filename
 
 
@@ -184,25 +167,11 @@ def get_state_location():
   """
   location_data = get_location()
 
-  closest_city = find_closest_city(location_data["latitude"],
+  closest_state = find_closest_state(location_data["latitude"],
     location_data["longitude"])
 
-  code = closest_city["country_code"] + "." + str(closest_city["state_code"])
-
-  # Download the states.txt database
-  get_file_from_server(statefilename)
-
-  state_fileobj = openfile(statefilename, False)
-  state_file = state_fileobj.readat(None, 0).split("\n")
-
-  # Look for the state corresponding to the code
-  for line in state_file:
-    state_record = line.split("\t")
-    if code == state_record[0]:
-      location_data["latitude"] = state_record[2]
-      location_data["longitude"] = state_record[3]
-      break
-  state_fileobj.close()
+  location_data["latitude"] = closest_state["latitude"]
+  location_data["longitude"] = closest_state["longitude"]
 
   return location_data
 
@@ -224,25 +193,11 @@ def get_state_lastknown_location():
     if provider_location_data is None:
       continue
 
-    closest_city = find_closest_city(provider_location_data["latitude"],
+    closest_state = find_closest_state(provider_location_data["latitude"],
       provider_location_data["longitude"])
-
-    code = closest_city["country_code"] + "." + str(closest_city["state_code"])
-
-    # Download the states.txt database
-    get_file_from_server(statefilename)
-
-    state_fileobj = openfile(statefilename, False)
-    state_file = state_fileobj.readat(None, 0).split("\n")
-
-    # Look for the state corresponding to the code
-    for line in state_file:
-      state_record = line.split("\t")
-      if code == state_record[0]:
-        provider_location_data["latitude"] = state_record[2]
-        provider_location_data["longitude"] = state_record[3]
-        break
-    state_fileobj.close()
+    
+    location_data[location_provider]["latitude"] = closest_state["latitude"]
+    location_data[location_provider]["longitude"] = closest_state["longitude"]
 
   return location_data
 
