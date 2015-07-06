@@ -42,22 +42,21 @@ def load_city_geodata(filename):
   city_dict = {}
   city_geodata_fileobj = openfile(filename, False)
   city_geodata_file = city_geodata_fileobj.readat(None, 0).split("\n")
+  city_geodata_fileobj.close()
 
   for line in city_geodata_file:
-    # Ignore the empty line at the end of the file
+    # Ignore the empty line at the end of the file.
     if line == "":
       continue
     city_geodata_record = line.split("\t")
     city_name = city_geodata_record[0]
-    lat = float(city_geodata_record[1])
-    lon = float(city_geodata_record[2])
     city_dict[city_name] = {
-      "latitude": lat,
-      "longitude": lon,
+      "latitude": float(city_geodata_record[1]),
+      "longitude": float(city_geodata_record[2]),
       "country_code": city_geodata_record[3],
       "state_code": city_geodata_record[4]
     }
-  city_geodata_fileobj.close()
+
   return city_dict
 
 
@@ -110,18 +109,14 @@ def find_closest_city(lat, lon):
       city_geodata["longitude"]))
     if diff < min_diff:
       min_diff = diff
-      closest_city_latitude = city_geodata["latitude"]
-      closest_city_longitude = city_geodata["longitude"]
       closest_city_name = city_name
-      closest_city_state_code = city_geodata["state_code"]
-      closest_city_country_code = city_geodata["country_code"]
 
   closest_city_geodata = {
     "city_name": closest_city_name,
-    "latitude": closest_city_latitude, 
-    "longitude": closest_city_longitude,
-    "state_code": closest_city_state_code,
-    "country_code": closest_city_country_code
+    "latitude": city_dict[closest_city_name]["latitude"], 
+    "longitude": city_dict[closest_city_name]["longitude"],
+    "state_code": city_dict[closest_city_name]["state_code"],
+    "country_code": city_dict[closest_city_name]["country_code"]
    }
 
   return closest_city_geodata
@@ -137,7 +132,7 @@ def get_database_filename(lat, lon):
   # Get ceiling as x/y index.
   x = int(math.math_ceil(lat))
   y = int(math.math_ceil(lon))
-  filename = str(x) + '_' + str(y) + '.txt'
+  filename = str(x) + '_' + str(y) + ".txt"
   return filename
 
 
@@ -185,7 +180,7 @@ def get_city_lastknown_location():
   """
   location_data = get_lastknown_location()
 
-  # Get the location from every provider
+  # Get the location from every provider.
   for location_provider, provider_location_data in location_data.items():
     # Skip blurring this provider's data if it doesn't contain a previous
     # location.
@@ -223,5 +218,5 @@ CHILD_CONTEXT_DEF["get_lastknown_location"] = {
 }
 
 
-# Dispatch
+# Dispatch.
 secure_dispatch_module()
