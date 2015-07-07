@@ -6,7 +6,7 @@ to the geographic center of approximately the nearest ZIP code.
 
 The blurring is done using a database lookup method. The database,
 located at http://sensibilityclearinghouse.poly.edu/data/zip/, contains
-a list of ZIP codes and their geodata (country, area, state, latitude,
+a list of ZIP codes and their geodata (2-letter country code, latitude,
 longitude), divided by their latitude/longitude coordinates into cells.
 Each cell is a separate file in the database, whose name is derived as
 "ceiling(latitude)_ceiling(longitude).txt". For example, if a location
