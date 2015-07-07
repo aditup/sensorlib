@@ -50,8 +50,8 @@ def load_zipcodes_geodata(filename):
     zipcode_geodata_record = line.split("\t")
     zipcode = zipcode_geodata_record[1]
     zipcodes_dict[int(zipcode)] = {
-      "latitude": float(zipcode_geodata_record[4]),
-      "longitude": float(zipcode_geodata_record[5]),
+      "latitude": float(zipcode_geodata_record[2]),
+      "longitude": float(zipcode_geodata_record[3]),
     }
 
   return zipcodes_dict
@@ -171,7 +171,7 @@ def get_zipcode_lastknown_location():
   """
   location_data = get_lastknown_location()
 
-  # Get the location from every provider
+  # Get the location from every provider.
   for location_provider, provider_location_data in location_data.items():
     # Skip blurring this provider's data if it doesn't contain a previous
     # location.
@@ -209,5 +209,5 @@ CHILD_CONTEXT_DEF["get_lastknown_location"] = {
 }
 
 
-# Dispatch
+# Dispatch.
 secure_dispatch_module()
