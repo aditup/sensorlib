@@ -2,16 +2,15 @@
 A security layer for the functions get_location() and get_lastknown_location()
 defined in getsensor.r2py. This program blurs the latitude/longitude
 coordinates, received from the location sensors of an Android device,
-to the geographic center of approximately the nearest ZIP code.
+to the geographic center of approximately the nearest ZIP code area.
 
 The blurring is done using a database lookup method. The database,
 located at http://sensibilityclearinghouse.poly.edu/data/zip/, contains
-a list of ZIP codes and their geodata (2-letter country code, latitude,
-longitude), divided by their latitude/longitude coordinates into cells.
-Each cell is a separate file in the database, whose name is derived as
-"ceiling(latitude)_ceiling(longitude).txt". For example, if a location
-has coordinates 40.78343, -73.96625, it will be mapped to the file with
-name "41_-73.txt".
+a list of ZIP codes and their geodata, divided by their latitude/longitude
+coordinates into cells. Each cell is a separate file in the database,
+whose name is derived as "ceiling(latitude)_ceiling(longitude).txt".
+For example, if a location has coordinates (40.78343, -73.96625), it
+will be mapped to the file with name "41_-73.txt".
 
 Usage:
   start dylink.r2py encasementlib.r2py sensor_layer.r2py \
@@ -20,16 +19,21 @@ Usage:
 
 
 
-httpretrieve = dy_import_module("httpretrieve.r2py")
-math = dy_import_module("math.r2py")
+location_blur_helper = dy_import_module("location_blur_helper.r2py")
 
 
 
-def load_zipcodes_geodata(filename):
+def load_zipcode_geodata(lat, lon):
   """
-  Loads all the ZIP codes and their latitude/longitude coordinates from
-  the given file into a dictionary. The dictionary that is returned
-  has the format:
+  Loads all ZIP codes and corresponding geodata from the given file
+  into a dictionary.
+
+  Below is an example of a line from the file
+  http://sensibilityclearinghouse.poly.edu/data/zip/41_-73.txt
+  with fields - country code, ZIP code, latitude, longitude:
+  US    10012    40.7255    -73.9983
+
+  The dictionary that is returned has the format:
   {
     zipcode1: {"latitude": latitude, "longitude": longitude},
     zipcode2: {"latitude": latitude, "longitude": longitude},
@@ -37,19 +41,22 @@ def load_zipcodes_geodata(filename):
   }
 
   """
-  get_file_from_server(filename)
-  zipcodes_dict = {}
-  zipcodes_geodata_fileobj = openfile(filename, False)
-  zipcodes_geodata_file = zipcodes_geodata_fileobj.readat(None, 0).split("\n")
-  zipcodes_geodata_fileobj.close()
+  # Determine which file to download from the database.
+  filename = location_blur_helper.get_database_filename(lat, lon)
+  # Download the file from the ZIP code database.
+  location_blur_helper.get_zipcode_file_from_server(filename)
+  # Obtain the list of ZIP codes and their geodata from the file.
+  zipcodes_geodata = location_blur_helper.read_data_from_file(filename)
 
-  for line in zipcodes_geodata_file:
+  zipcodes_dict = {}
+
+  for line in zipcodes_geodata:
     # Ignore the empty line at the end of the file.
     if line == "":
       continue
     zipcode_geodata_record = line.split("\t")
     zipcode = zipcode_geodata_record[1]
-    zipcodes_dict[int(zipcode)] = {
+    zipcodes_dict[zipcode] = {
       "latitude": float(zipcode_geodata_record[2]),
       "longitude": float(zipcode_geodata_record[3]),
     }
@@ -58,25 +65,13 @@ def load_zipcodes_geodata(filename):
 
 
 
-def get_file_from_server(filename):
-  """
-  Downloads the required file from the database server, if it has not
-  already been downloaded.
-
-  """
-  if filename not in listfiles():
-    url = "http://sensibilityclearinghouse.poly.edu/data/zip/" + filename
-    httpretrieve.httpretrieve_save_file(url, filename)
-
-
-
 def find_closest_zipcode(lat, lon):
   """
   Finds the ZIP code closest to the given latitude/longitude pair from the
-  dictionary of ZIP codes returned by the load_zipcodes_geodata() function,
-  and returns that ZIP code's coordinates in the format:
+  dictionary of ZIP codes returned by the load_zipcode_geodata() function,
+  and returns that ZIP code's geodata in the format:
   {
-    "zipcode": ZIP code (int),
+    "zipcode": ZIP code (string),
     "latitude": latitude of the center of the ZIP code area (float)
     "longitude": longitude of the center of the ZIP code area (float)
   }
@@ -86,60 +81,10 @@ def find_closest_zipcode(lat, lon):
   area in the surrounding cells.
 
   """
-  # Determine which file to download from the database.
-  filename = get_database_filename(lat, lon)
+  # Load all ZIP codes and corresponding geodata from the file.
+  zipcodes_dict = load_zipcode_geodata(lat, lon)
 
-  # Load all the ZIP codes and their geodata from the file.
-  zipcodes_dict = load_zipcodes_geodata(filename)
-
-  # Set the minimum squared difference between two pairs of coordinates
-  # to a number larger than any possible minimum distance to a close
-  # ZIP code area in the current latitude/longitude quadilateral.
-  min_diff = 9999
-
-  for zipcode, zipcode_geodata in zipcodes_dict.items():
-    diff = find_squared_difference((lat, lon), (zipcode_geodata["latitude"],
-      zipcode_geodata["longitude"]))
-    if diff < min_diff:
-      min_diff = diff
-      closest_zipcode = zipcode
-
-  closest_zipcode_geodata = {
-    "zipcode": closest_zipcode,
-    "latitude": zipcodes_dict[closest_zipcode]["latitude"], 
-    "longitude": zipcodes_dict[closest_zipcode]["longitude"],
-   }
-
-  return closest_zipcode_geodata
-
-
-
-def get_database_filename(lat, lon):
-  """
-  Returns the filename of the cell in the database to which the given
-  latitude/longitude pair belongs.
-
-  """
-  # Get ceiling as x/y index.
-  x = int(math.math_ceil(lat))
-  y = int(math.math_ceil(lon))
-  filename = str(x) + '_' + str(y) + ".txt"
-  return filename
-
-
-
-def find_squared_difference(p1, p2):
-  """
-  Returns the squared difference between the two given pairs of 
-  coordinates (p1 and p2, where p1 and p2 are tuples of the form
-  (latitude, longitude)).
-
-  """
-  lat1, lon1 = p1
-  lat2, lon2 = p2
-  lat_diff = (lat1-lat2) ** 2
-  lon_diff = (lon1-lon2) ** 2
-  return lat_diff + lon_diff
+  return location_blur_helper.find_closest_location(lat, lon, zipcodes_dict)
 
 
 
@@ -171,16 +116,25 @@ def get_zipcode_lastknown_location():
   """
   location_data = get_lastknown_location()
 
-  # Get the location from every provider.
+  # Blur the coordinates of the first non-empty location data.
   for location_provider, provider_location_data in location_data.items():
-    # Skip blurring this provider's data if it doesn't contain a previous
+    # Skip this provider's data if it doesn't contain a previous
     # location.
     if provider_location_data is None:
       continue
 
     closest_zipcode = find_closest_zipcode(provider_location_data["latitude"],
       provider_location_data["longitude"])
-    
+
+    break
+
+  # Copy the blurred coordinates into all providers' location data.
+  for location_provider, provider_location_data in location_data.items():
+    # Skip blurring this provider's data if it doesn't contain a previous
+    # location.
+    if provider_location_data is None:
+      continue
+
     location_data[location_provider]["latitude"] = closest_zipcode["latitude"]
     location_data[location_provider]["longitude"] = closest_zipcode["longitude"]
 

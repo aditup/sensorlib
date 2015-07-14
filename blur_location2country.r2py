@@ -5,14 +5,11 @@ coordinates, received from the location sensors of an Android device,
 to the geographic center of the country to which it belongs.
 
 The blurring is done using a database lookup method. First, we use the
-get_geolocation() call to get the current address. The country code 
-("country_code") in the address returned is then used to find a match
-in the database "countries.txt", which is a list of all countries and
-their geodata (country code, latitude, longitude). The country code is
-the ISO-3166 2-letter code assigned to the country and the latitude and
-longitude coordinates represent the geographical center of the country.
+get_geolocation() call to get the current address. The country code in
+the address returned is then used to find a match in the database
+"countries.txt", which is a list of all countries and their geodata.
 This database file is located at:
-http://sensibilityclearinghouse.poly.edu/data/
+http://sensibilityclearinghouse.poly.edu/data/countries.txt
 
 Usage:
   start dylink.r2py encasementlib.r2py sensor_layer.r2py \
@@ -21,66 +18,92 @@ Usage:
 
 
 
-httpretrieve = dy_import_module("httpretrieve.r2py")
-math = dy_import_module("math.r2py")
-
-
-
-def get_file_from_server(filename):
-  """
-  Downloads the required file from the database server, if it has not
-  already been downloaded.
-
-  """
-  if filename not in listfiles():
-    url = "http://sensibilityclearinghouse.poly.edu/data/" + filename
-    httpretrieve.httpretrieve_save_file(url, filename.lower())
+location_blur_helper = dy_import_module("location_blur_helper.r2py")
+country_filename = "countries.txt"
 
 
 
 def load_country_geodata(address):
   """
-  Finds the country in the database which has the same country code as
-  that in the given address and returns a dictionary with that country's
-  name, latitude and longitude.
+  Loads the country (or countries) and corresponding geodata from the
+  given file into a dictionary.
 
-  Below is an example of a line from the database of countries -
-  "countries.txt" (country code, name, latitude and longitude):
+  Below is an example of a line from the file "countries.txt" with
+  fields - country code, country name, latitude and longitude:
   US    United States    39.76    -98.5
 
   The dictionary returned has the format:
   {
-    "country_name": state name (string),
-    "latitude": latitude of the geographic center of the country (float)
-    "longitude": longitude of the geographic center of the country (float)
+    country1: {"latitude": latitude, "longitude": longitude},
+    country2: {"latitude": latitude, "longitude": longitude},
+    ...
   }
 
   """
-  # Download the database of countries.
-  get_file_from_server("countries.txt")
+  # Download the file from the country database.
+  location_blur_helper.get_country_file_from_server(country_filename)
+  # Obtain the list of countries and their geodata from the file.
+  countries_geodata = location_blur_helper.read_data_from_file(country_filename)
 
-  # Open the database of countries and read all data.
-  countries_geodata_fileobj = openfile("countries.txt", False)
-  countries_geodata_file = countries_geodata_fileobj.readat(None, 0).split("\n")
-  countries_geodata_fileobj.close()
+  country_dict = {}
 
-  # Compare the country code from the address with the country code for
-  # each country in the database to find a match.
-  for line in countries_geodata_file:
+  # Check if we can match the country code in the given address to that
+  # in the database. If there is a match, return a dict with that
+  # country and its geodata.
+  for line in countries_geodata:
     # Ignore the empty line at the end of the file.
     if line == "":
       continue
     country_geodata_record = line.split("\t")
-    # If there is a match, return the country name and its coordinates.
     if address["country_code"] == country_geodata_record[0]:
-      country_geodata = {
-        "country_name": country_geodata_record[1],
+      country_name = country_geodata_record[1]
+      country_dict[country_name] = {
         "latitude": float(country_geodata_record[2]),
         "longitude": float(country_geodata_record[3])
       }
-      return country_geodata
+      return country_dict
 
-  # XXX will there ever not be a match?
+  # If no match, return a dict of all countries and their geodata to
+  # find the closest country.
+  for line in countries_geodata:
+    # Ignore the empty line at the end of the file.
+    if line == "":
+      continue
+    country_geodata_record = line.split("\t")
+    country_name = country_geodata_record[1]
+    country_dict[country_name] = {
+      "latitude": float(country_geodata_record[2]),
+      "longitude": float(country_geodata_record[3]),
+    }
+
+  return country_dict
+
+
+def find_closest_country(lat, lon):
+  """
+  Finds the country closest to the given latitude/longitude pair from the
+  dictionary of countries returned by the load_country_geodata() function,
+  and returns that country's geodata in the format:
+  {
+    "country_name": country name (string),
+    "latitude": latitude of the center of the country (float)
+    "longitude": longitude of the center of the country (float)
+  }
+
+  Note: If the load_country_geodata() function returns only one country,
+  which happens when the country code from the get_geolocation() call
+  was successfully matched with one of the countries' code in the database,
+  then only that country's geodata is returned in the dictionary.
+
+  """
+  # Get the address for the given coordinates. Since get_geolocation()
+  # can possibly return more than one address, we take the first one.
+  address = get_geolocation(lat, lon, 1)[0]
+
+  # Load the state(s) and corresponding geodata from the file.
+  countries_dict = load_country_geodata(address)
+
+  return location_blur_helper.find_closest_location(lat, lon, countries_dict)
 
 
 
@@ -93,15 +116,11 @@ def get_country_location():
   """
   location_data = get_location()
 
-  # Get the first address from the list of addresses returned by
-  # get_geolocation().
-  address = get_geolocation(location_data["latitude"],
-    location_data["longitude"], 1)[0]
+  closest_country = find_closest_country(location_data["latitude"],
+    location_data["longitude"])
 
-  country_geodata = load_country_geodata(address)
-
-  location_data["latitude"] = country_geodata["latitude"]
-  location_data["longitude"] = country_geodata["longitude"]
+  location_data["latitude"] = closest_country["latitude"]
+  location_data["longitude"] = closest_country["longitude"]
 
   return location_data
 
@@ -116,22 +135,27 @@ def get_country_lastknown_location():
   """
   location_data = get_lastknown_location()
 
-  # Get the location from every provider.
+  # Blur the coordinates of the first non-empty location data.
+  for location_provider, provider_location_data in location_data.items():
+    # Skip this provider's data if it doesn't contain a previous
+    # location.
+    if provider_location_data is None:
+      continue
+
+    closest_country = find_closest_country(provider_location_data["latitude"],
+      provider_location_data["longitude"])
+
+    break
+
+  # Copy the blurred coordinates into all providers' location data.
   for location_provider, provider_location_data in location_data.items():
     # Skip blurring this provider's data if it doesn't contain a previous
     # location.
     if provider_location_data is None:
       continue
 
-    # Get the first address from the list of addresses returned by
-    # get_geolocation().
-    address = get_geolocation(provider_location_data["latitude"],
-      provider_location_data["longitude"], 1)[0]
-
-    country_geodata = load_country_geodata(address)
-
-    location_data[location_provider]["latitude"] = country_geodata["latitude"]
-    location_data[location_provider]["longitude"] = country_geodata["longitude"]
+    location_data[location_provider]["latitude"] = closest_country["latitude"]
+    location_data[location_provider]["longitude"] = closest_country["longitude"]
 
   return location_data
 
