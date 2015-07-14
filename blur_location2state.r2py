@@ -5,24 +5,20 @@ coordinates, received from the location sensors of an Android device,
 to the geographic center of approximately the nearest state (admin division).
 
 The blurring is done using a database lookup method. First, we use the
-get_geolocation() call to get the current address. The country code in
-the address returned is then used to look up the list of states for
-that country from the database. This database, located at
-http://sensibilityclearinghouse.poly.edu/data/states/, is a list of all
-states/admin divisions and their corresponding geodata (state code,
-latitude, longitude) divided by country, where each file is named with
-the 2-letter country code (e.g., "US.txt").
+get_geolocation() call to get the current address. The country code 
+("country_code") in the address returned is then used to look up the 
+list of states for that country from the database. This database,
+located at http://sensibilityclearinghouse.poly.edu/data/states/, is a 
+list of all states/admin divisions and their corresponding geodata
+(state code, latitude, longitude) divided by country, where each file
+is named with the 2-letter country code (e.g., "US.txt").
 
-Next, we use the state code and country code from the city's geodata to
-look up the coordinates of the geographic center of the state to which
-the city belongs. This look up uses the states' database, states.txt,
-located at http://sensibilityclearinghouse.poly.edu/data/. states.txt
-is a database of the top level administrative divisions within each
-country (for example, states/provinces). It has the following fields:
-code, state name, latitude, longitude. The code field has the format
-"country_code.state_code", where country_code is the ISO-3166 2-letter
-country code of the country to which the admin division belongs and
-state_code is the 2-digit state code representing the admin division.
+Next, we use the state name ("admin_area") from the returned address to
+check for a match with the list of states. If there is a match, the
+coordinates associated with that state are returned. If there is no
+match, we look for the state that has coordinates closest to the
+those received from the location sensors of the Android device
+and return its latitude and longitude.
 
 Usage:
   start dylink.r2py encasementlib.r2py sensor_layer.r2py \
@@ -31,15 +27,21 @@ Usage:
 
 
 
-httpretrieve = dy_import_module("httpretrieve.r2py")
-math = dy_import_module("math.r2py")
+blur_helper = dy_import_module("blur_helper.r2py")
 
 
 
 def load_state_geodata(filename, address):
   """
-  Loads all the states and their geodata from the given file into a
-  dictionary. The dictionary that is returned has the format:
+  Loads the state(s) and the corresponding latitude and longitude from
+  the given file into a dictionary.
+  
+  Below is an example of a line from the given file (state code, state
+  name, latitude, longitude):
+  US.NY    New York    43.00035    -75.4999
+  
+  The dictionary that is returned has
+  the format:
   {
     state1: {"latitude": latitude, "longitude": longitude},
     state2: {"latitude": latitude, "longitude": longitude},
@@ -85,39 +87,22 @@ def load_state_geodata(filename, address):
 
 
 
-def get_file_from_server(filename):
-  """
-  Downloads the required file from the database server, if it has not
-  already been downloaded.
-
-  """
-  if filename not in listfiles():
-    url = "http://sensibilityclearinghouse.poly.edu/data/states/" + filename
-    httpretrieve.httpretrieve_save_file(url, filename.lower())
-
-
-
 def find_closest_state(lat, lon):
   """
-  Finds the city closest to the given latitude/longitude pair from the
-  dictionary of cities returned by the load_city_geodata() function,
-  and returns that city's geodata in the format:
+  Finds the state closest to the given latitude/longitude pair from the
+  dictionary of states returned by the load_state_geodata() function,
+  and returns its name, latitude and longitude in a dictionary. If the
+  load_state_geodata() function returns only one state, then that
+  state's name along with its latitude and longitude is returned in the
+  dictionary.
+  The dictionary returned has the format:
   {
-    "city_name": city name (string),
-    "state_code": 2-digit code representing the state to which the city
-      belongs (string),
-    "country_code": 2-letter ISO-3166 code representing the country to
-      which the city belongs (string),
-    "latitude": latitude of the geographic center of the city (float)
-    "longitude": longitude of the geographic center of the city (float)
+    "state_name": state name (string),
+    "latitude": latitude of the geographic center of the state (float)
+    "longitude": longitude of the geographic center of the state (float)
   }
 
-  Note: We're looking for the closest city within the same cell as the
-  given latitude/longitude pair. There might be a closer city in the
-  surrounding cells.
-
   """
-
   # Get the address for the given coordinates.
   address = get_geolocation(lat, lon, 1)[0]
 
@@ -126,51 +111,12 @@ def find_closest_state(lat, lon):
   filename = address["country_code"] + ".txt"
 
   # Download the file from the server.
-  get_file_from_server(filename)
+  blur_helper.get_file_from_server(filename, 2)
 
   # Load the state(s) and corresponding geodata from the file.
   states_dict = load_state_geodata(filename, address)
 
-  # Check if there is only one state in the dictionary.
-  if len(states_dict) == 1:
-    closest_state_name = states_dict.keys()[0]
-
-  # Else find closest state.
-  else:
-    # Set the minimum squared difference between two pairs of coordinates
-    # to a number larger than any possible minimum distance to a close
-    # state in the current country.
-    min_diff = 9999
-
-    for state_name, state_geodata in states_dict.items():
-      diff = find_squared_difference((lat, lon), (state_geodata["latitude"],
-        state_geodata["longitude"]))
-      if diff < min_diff:
-        min_diff = diff
-        closest_state_name = state_name
-
-  closest_state_geodata = {
-    "state_name": closest_state_name,
-    "latitude": states_dict[closest_state_name]["latitude"], 
-    "longitude": states_dict[closest_state_name]["longitude"],
-   }
-
-  return closest_state_geodata
-
-
-
-def find_squared_difference(p1, p2):
-  """
-  Returns the squared difference between the two given pairs of 
-  coordinates (p1 and p2, where p1 and p2 are tuples of the form
-  (latitude, longitude)).
-
-  """
-  lat1, lon1 = p1
-  lat2, lon2 = p2
-  lat_diff = (lat1-lat2) ** 2
-  lon_diff = (lon1-lon2) ** 2
-  return lat_diff + lon_diff
+  return blur_helper.find_closest_blur_level(lat, lon, states_dict)
 
 
 

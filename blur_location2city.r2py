@@ -20,8 +20,7 @@ Usage:
 
 
 
-httpretrieve = dy_import_module("httpretrieve.r2py")
-math = dy_import_module("math.r2py")
+blur_helper = dy_import_module("blur_helper.r2py")
 
 
 
@@ -38,7 +37,7 @@ def load_city_geodata(filename):
   }
 
   """
-  get_file_from_server(filename)
+  blur_helper.get_file_from_server(filename, 1)
   city_dict = {}
   city_geodata_fileobj = openfile(filename, False)
   city_geodata_file = city_geodata_fileobj.readat(None, 0).split("\n")
@@ -58,18 +57,6 @@ def load_city_geodata(filename):
     }
 
   return city_dict
-
-
-
-def get_file_from_server(filename):
-  """
-  Downloads the required file from the database server, if it has not
-  already been downloaded.
-
-  """
-  if filename not in listfiles():
-    url = "http://sensibilityclearinghouse.poly.edu/data/quad/" + filename
-    httpretrieve.httpretrieve_save_file(url, filename)
 
 
 
@@ -94,61 +81,12 @@ def find_closest_city(lat, lon):
 
   """
   # Determine which file to download from the database.
-  filename = get_database_filename(lat, lon)
+  filename = blur_helper.get_database_filename(lat, lon)
 
   # Load all the cities and their geodata from the file.
   city_dict = load_city_geodata(filename)
 
-  # Set the minimum squared difference between two pairs of coordinates
-  # to a number larger than any possible minimum distance to a close
-  # city in the current latitude/longitude quadrilateral.
-  min_diff = 9999
-
-  for city_name, city_geodata in city_dict.items():
-    diff = find_squared_difference((lat, lon), (city_geodata["latitude"],
-      city_geodata["longitude"]))
-    if diff < min_diff:
-      min_diff = diff
-      closest_city_name = city_name
-
-  closest_city_geodata = {
-    "city_name": closest_city_name,
-    "latitude": city_dict[closest_city_name]["latitude"], 
-    "longitude": city_dict[closest_city_name]["longitude"],
-    "state_code": city_dict[closest_city_name]["state_code"],
-    "country_code": city_dict[closest_city_name]["country_code"]
-   }
-
-  return closest_city_geodata
-
-
-
-def get_database_filename(lat, lon):
-  """
-  Returns the filename of the cell in the database to which the given
-  latitude/longitude pair belongs.
-
-  """
-  # Get ceiling as x/y index.
-  x = int(math.math_ceil(lat))
-  y = int(math.math_ceil(lon))
-  filename = str(x) + '_' + str(y) + ".txt"
-  return filename
-
-
-
-def find_squared_difference(p1, p2):
-  """
-  Returns the squared difference between the two given pairs of
-  coordinates (p1 and p2, where p1 and p2 are tuples of the form
-  (latitude, longitude)).
-
-  """
-  lat1, lon1 = p1
-  lat2, lon2 = p2
-  lat_diff = (lat1-lat2) ** 2
-  lon_diff = (lon1-lon2) ** 2
-  return lat_diff + lon_diff
+  return blur_helper.find_closest_blur_level(lat, lon, city_dict)
 
 
 
