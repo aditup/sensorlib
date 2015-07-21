@@ -1,7 +1,7 @@
 """
 This is a helper program that contains some of the common functions
 shared between the blurring layers blur_location2city, blur_location2zipcode,
-and blur_location2state.
+blur_location2state and blur_location2country.
 
 """
 
@@ -12,28 +12,63 @@ math = dy_import_module("math.r2py")
 
 
 
-def get_file_from_server(filename, blur_level):
+def get_zipcode_file_from_server(filename):
   """
   Downloads the required file from the database server, if it has not
   already been downloaded.
 
-  The blur_level argument is an integer which indicates the blurring
-  level (blurring to ZIP code, city or state):
-  0 - zipcode
-  1 - city
-  2 - state
+  The database is located at:
+  http://sensibilityclearinghouse.poly.edu/data/zip/
 
   """
   if filename not in listfiles():
-    if blur_level == 0:
-      folder = "zip/"
-    elif blur_level == 1:
-      folder = "quad/"
-    elif blur_level == 2:
-      folder = "states/"
-    url = "http://sensibilityclearinghouse.poly.edu/data/" + folder + \
-      filename
+    url = "http://sensibilityclearinghouse.poly.edu/data/zip/" + filename
+    httpretrieve.httpretrieve_save_file(url, filename)
+
+
+
+def get_city_file_from_server(filename):
+  """
+  Downloads the required file from the database server, if it has not
+  already been downloaded.
+
+  The database is located at:
+  http://sensibilityclearinghouse.poly.edu/data/quad/
+
+  """
+  if filename not in listfiles():
+    url = "http://sensibilityclearinghouse.poly.edu/data/quad/" + filename
+    httpretrieve.httpretrieve_save_file(url, filename)
+
+
+
+def get_state_file_from_server(filename):
+  """
+  Downloads the required file from the database server, if it has not
+  already been downloaded.
+
+  The database is located at:
+  http://sensibilityclearinghouse.poly.edu/data/states/
+
+  """
+  if filename not in listfiles():
+    url = "http://sensibilityclearinghouse.poly.edu/data/states/" + filename
     httpretrieve.httpretrieve_save_file(url, filename.lower())
+
+
+
+def get_country_file_from_server(filename):
+  """
+  Downloads the required file from the database server, if it has not
+  already been downloaded.
+
+  The database is located at:
+  http://sensibilityclearinghouse.poly.edu/data/countries.txt
+
+  """
+  if filename not in listfiles():
+    url = "http://sensibilityclearinghouse.poly.edu/data/" + filename
+    httpretrieve.httpretrieve_save_file(url, filename)
 
 
 
@@ -66,33 +101,64 @@ def find_squared_difference(p1, p2):
 
 
 
-def find_closest_blur_level(lat, lon, blur_level_dict):
+def read_data_from_file(filename):
   """
+  Reads all data from the given file and returns a list of the lines
+  in that file.
 
   """
-  # Check if there is only one entry in the dictionary.
-  if len(blur_level_dict) == 1:
-    closest_blur_level = blur_level_dict.keys()[0]
+  fileobj = openfile(filename.lower(), False)
+  file_data = fileobj.readat(None, 0).split("\n")
+  fileobj.close()
+  return file_data
 
-  # Else find closest blur level area (ZIP code area, city or state).
+
+
+def find_closest_location(lat, lon, location_dict):
+  """
+  Returns a dictionary with the name and coordinates of the center of
+  the closest location to the given latitude and longitude coordinates.
+  This location, depending on the level of blurring, could be the
+  closest city, state, ZIP code area or country.
+
+  The argument "location_dict" contains a list of all nearby
+  locations (either cities, states, ZIP code areas or countries) and
+  their geodata (latitude and longitude).
+
+  The dictionary returned has the format:
+  {
+    "name": name of the closest location (string),
+    "latitude": latitude of the center of the above location (float), 
+    "longitude": longitude of the center of the above location (float)
+  }
+  """
+  # Check if there is only one entry in the dictionary, (e.g., in a state
+  # file like this http://sensibilityclearinghouse.poly.edu/data/states/US.txt
+  # there's only one entry that matches the state name)
+  if len(location_dict) == 1:
+    closest_location = location_dict.keys()[0]
+
+  # Else find closest location.
   else:
     # Set the minimum squared difference between two pairs of coordinates
     # to a number larger than any possible minimum distance to a close
-    # blur level area (ZIP code area, city or state) in the current
-    # latitude/longitude quadilateral.
+    # location in the current latitude/longitude quadilateral (in case
+    # of blurring to city/ZIP code area), in the current country (in
+    # case of blurring to state), or in the entire world (in case of
+    # blurring to country).
     min_diff = 9999
 
-    for blur_level, blur_level_geodata in blur_level_dict.items():
-      diff = find_squared_difference((lat, lon), (blur_level_geodata["latitude"],
-        blur_level_geodata["longitude"]))
+    for current_location, location_geodata in location_dict.items():
+      diff = find_squared_difference((lat, lon), (location_geodata["latitude"],
+        location_geodata["longitude"]))
       if diff < min_diff:
         min_diff = diff
-        closest_blur_level = blur_level
+        closest_location = current_location
 
-  closest_blur_level_geodata = {
-    "name": closest_blur_level,
-    "latitude": blur_level_dict[closest_blur_level]["latitude"], 
-    "longitude": blur_level_dict[closest_blur_level]["longitude"],
+  closest_location_geodata = {
+    "name": closest_location,
+    "latitude": location_dict[closest_location]["latitude"], 
+    "longitude": location_dict[closest_location]["longitude"]
    }
 
-  return closest_blur_level_geodata
+  return closest_location_geodata
