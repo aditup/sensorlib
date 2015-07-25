@@ -142,8 +142,8 @@ def find_closest_location(lat, lon, location_dict):
   else:
     # Set the minimum squared difference between two pairs of coordinates
     # to a number larger than any possible minimum distance to a close
-    # location in the current latitude/longitude quadilateral (in case
-    # of blurring to city/ZIP code area), in the current country (in
+    # location in the current latitude/longitude cell (in case of
+    # blurring to city/ZIP code area), in the current country (in
     # case of blurring to state), or in the entire world (in case of
     # blurring to country).
     min_diff = 9999
