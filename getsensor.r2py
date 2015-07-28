@@ -567,7 +567,7 @@ def microphone_record(filename, duration):
   targetpath = filepath + filename
   
   sensorlib.request_data(sensor_socket, 'recorderStartMicrophone', [targetpath])
-  sleep(duration)
+  sleep(duration+1)
   
   sensorlib.request_data(sensor_socket, 'recorderStop', [])
 
