@@ -1022,11 +1022,6 @@ def get_orientation():
 
   return sensorlib.request_data(sensor_socket,
     'sensorsReadOrientation', [])
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> SensibilityTestbed/master
 
 
 
@@ -1071,10 +1066,6 @@ def get_wifi_connection_info():
 
   <Exceptions>
   None. 
-<<<<<<< HEAD
->>>>>>> SensibilityTestbed/master
-=======
->>>>>>> SensibilityTestbed/master
 
   <Side Effects>
   None.
