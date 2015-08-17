@@ -1,36 +1,57 @@
+"""
+A security layer for the functions get_location() and get_lastknown_location()
+defined in getsensor.r2py. This program blurs the latitude/longitude
+coordinates, received from the location sensors of an Android device,
+by rounding them off to one decimal place.
+
+Usage:
+  start dylink.r2py encasementlib.r2py sensor_layer.r2py \
+    blur_location_round.r2py user-program.r2py
+"""
+
+
+
 def blur_location_round():
+  """
+  Blurring layer for the get_location() function. It replaces the exact
+  coordinates of the Android device with the coordinates rounded off to
+  a single decimal place.
 
-  try:
-    location = get_location()
-  except Exception: # Not able to use LocationNotFoundException here
-    raise Exception
+  """
+  location_data = get_location()
 
-  # Blur the coordinates by rounding
-  location["latitude"] = round(float(location["latitude"]), 1)
-  location["longitude"] = round(float(location["longitude"]), 1)
+  location_data["latitude"] = round(float(location_data["latitude"]), 1)
+  location_data["longitude"] = round(float(location_data["longitude"]), 1)
 
-  return location
+  return location_data
 
 
 
 def blur_lastknown_location_round():
+  """
+  Blurring layer for the get_lastknown_location() function. It replaces
+  the last-known coordinates of the Android device with the coordinates
+  rounded off to a single decimal place.
 
-  try:
-    location = get_lastknown_location()
-  except Exception: # Not able to use LocationNotFoundException here
-    raise Exception
+  """
+  location_data = get_lastknown_location()
 
-  # Blur the coordinates by rounding
-  for i in range(len(location.keys())):
-    provider = location.keys()[i]
-    location_item = location[provider]
-    if location_item != None:
-      location[provider]["latitude"] = round(float(location_item["latitude"]), 1)
-      location[provider]["longitude"] = round(float(location_item["longitude"]), 1)
+  for location_provider, provider_location_data in location_data.items():
+    # Skip blurring this provider's data if it doesn't contain a previous
+    # location.
+    if provider_location_data is None:
+      continue
 
-  return location
+    location_data[location_provider]["latitude"] = \
+      round(float(provider_location_data["latitude"]), 1)
+    location_data[location_provider]["longitude"] = \
+      round(float(provider_location_data["longitude"]), 1)
+
+  return location_data
 
 
+
+# Mapping our blurring function blur_location_round to get_location.
 CHILD_CONTEXT_DEF["get_location"] = {
     "type": "func",
     "args": None,
@@ -40,6 +61,8 @@ CHILD_CONTEXT_DEF["get_location"] = {
 }
 
 
+# Mapping our blurring function blur_lastknown_location_round to
+# get_lastknown_location.
 CHILD_CONTEXT_DEF["get_lastknown_location"] = {
     "type": "func",
     "args": None,
@@ -49,4 +72,5 @@ CHILD_CONTEXT_DEF["get_lastknown_location"] = {
 }
 
 
+# Dispatch.
 secure_dispatch_module()
