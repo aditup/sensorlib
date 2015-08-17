@@ -20,9 +20,8 @@ def blur_location_round():
   """
   location_data = get_location()
 
-  if location_data is not None:
-    location_data["latitude"] = round(float(location_data["latitude"]), 1)
-    location_data["longitude"] = round(float(location_data["longitude"]), 1)
+  location_data["latitude"] = round(float(location_data["latitude"]), 1)
+  location_data["longitude"] = round(float(location_data["longitude"]), 1)
 
   return location_data
 
@@ -37,17 +36,16 @@ def blur_lastknown_location_round():
   """
   location_data = get_lastknown_location()
 
-  if location_data is not None:
-    for location_provider, provider_location_data in location_data.items():
-      # Skip blurring this provider's data if it doesn't contain a previous
-      # location.
-      if provider_location_data is None:
-        continue
+  for location_provider, provider_location_data in location_data.items():
+    # Skip blurring this provider's data if it doesn't contain a previous
+    # location.
+    if provider_location_data is None:
+      continue
 
-      location_data[location_provider]["latitude"] = \
-        round(float(provider_location_data["latitude"]), 1)
-      location_data[location_provider]["longitude"] = \
-        round(float(provider_location_data["longitude"]), 1)
+    location_data[location_provider]["latitude"] = \
+      round(float(provider_location_data["latitude"]), 1)
+    location_data[location_provider]["longitude"] = \
+      round(float(provider_location_data["longitude"]), 1)
 
   return location_data
 

@@ -97,12 +97,11 @@ def get_zipcode_location():
   """
   location_data = get_location()
 
-  if location_data is not None:
-    closest_zipcode = find_closest_zipcode(location_data["latitude"],
-      location_data["longitude"])
+  closest_zipcode = find_closest_zipcode(location_data["latitude"],
+    location_data["longitude"])
 
-    location_data["latitude"] = closest_zipcode["latitude"]
-    location_data["longitude"] = closest_zipcode["longitude"]
+  location_data["latitude"] = closest_zipcode["latitude"]
+  location_data["longitude"] = closest_zipcode["longitude"]
 
   return location_data
 
@@ -117,28 +116,27 @@ def get_zipcode_lastknown_location():
   """
   location_data = get_lastknown_location()
 
-  if location_data is not None:
-    # Blur the coordinates of the first non-empty location data.
-    for location_provider, provider_location_data in location_data.items():
-      # Skip this provider's data if it doesn't contain a previous
-      # location.
-      if provider_location_data is None:
-        continue
+  # Blur the coordinates of the first non-empty location data.
+  for location_provider, provider_location_data in location_data.items():
+    # Skip this provider's data if it doesn't contain a previous
+    # location.
+    if provider_location_data is None:
+      continue
 
-      closest_zipcode = find_closest_zipcode(provider_location_data["latitude"],
-        provider_location_data["longitude"])
+    closest_zipcode = find_closest_zipcode(provider_location_data["latitude"],
+      provider_location_data["longitude"])
 
-      break
+    break
 
-    # Copy the blurred coordinates into all providers' location data.
-    for location_provider, provider_location_data in location_data.items():
-      # Skip blurring this provider's data if it doesn't contain a previous
-      # location.
-      if provider_location_data is None:
-        continue
+  # Copy the blurred coordinates into all providers' location data.
+  for location_provider, provider_location_data in location_data.items():
+    # Skip blurring this provider's data if it doesn't contain a previous
+    # location.
+    if provider_location_data is None:
+      continue
 
-      location_data[location_provider]["latitude"] = closest_zipcode["latitude"]
-      location_data[location_provider]["longitude"] = closest_zipcode["longitude"]
+    location_data[location_provider]["latitude"] = closest_zipcode["latitude"]
+    location_data[location_provider]["longitude"] = closest_zipcode["longitude"]
 
   return location_data
 
